@@ -9,13 +9,34 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-1.See what distribution of gdp_per_capita / suicides_percentage is across countries.
+I decided to probe a database on suicide numbers to see if there was any correlation between suicide rate and gdp per capita. Of course, correlation is just that: correlation - not cause, and, as this site goes over in more detail, suicide is a VERY complex issue: https://ourworldindata.org/suicide
 
-```{r 1}
+I have no dreams of nailing down suicide to a single predictor, but let's see what relationships might exist, and hopefully learn some along the way.
+
+The dataset I'll use is available for download here: https://www.kaggle.com/russellyates88/suicide-rates-overview-1985-to-2016
+It'll download as a file with a ".csv" at the end. Don't worry about that, it's just a general form used to store datasets. You can get more info on it here: https://www.lifewire.com/csv-file-2622708
+
+First off, packages. They provide functions and datasets to us. We'll just use the function part of these. They'll make our lives easier by doing things for us.
+For more info on them you can go here: https://www.datacamp.com/community/tutorials/r-packages-guide
+
+
+
+On the first line, we'll load the tidyverse by using the command "library(tidyverse)".
+Of course, you'll have to make sure you have it installed first. You can do that in rstudio by going to the console and typing "install.packages(tidyverse)".
+The tidyverse is a bunch of packages designed to work together that you can load at once. For more info on it you can go here: https://www.tidyverse.org
+
+Next, start by thinking of a name for the database. I used "suicide_df". Then we'll load the database by using the read_csv function. Just pass in the file path to your csv file from the directory your in and then store it in the name you picked by putting the "<-" command between the two.
+
+Then we print the first couple rows of the database by passing the database name to the head function. Make sure it looks like mine does below. And for the read_csv function or any of the function I use below, go to this website if you want more info: https://www.rdocumentation.org/packages/plyr/versions/1.8.4/topics/rename
+
+```{r 1, message=FALSE}
 library(tidyverse)
 suicide_df <- read_csv("suicide.csv")
 head(suicide_df)
 ```
+
+
+Now it's time to get this database to look like how we want it to. By using rename we get ride of the ' (\$)' at the end of 'gdp_per_capita (\$)', since that'll be annoying to type everytime. Then, for the same reason, we we get rid of ' pop' at then end of 'suicides/100k pop'.
 
 ```{r 2}
 suicide_df <- suicide_df %>% rename('gdp_per_capita' = 'gdp_per_capita ($)' , 'suicide/100k' = 'suicides/100k pop') %>%
@@ -23,7 +44,9 @@ suicide_df <- suicide_df %>% rename('gdp_per_capita' = 'gdp_per_capita ($)' , 's
 head(suicide_df)
 ```
 
+This dataset separates the data by year and by age. We're just worried by the overall trends for now, so we need to get it so that each year only appears once for each country, and we also want the total population and suicide numbers for that year. 
 
+To do that we'll use the group_by function to group this dataset by country and then further by year, so that any function we perform is performed individually on each of these groups. We pass these functions to the summarize function. We'll use the sum function on the suicides_no column and on the population column. Now we want to get the gpd_per_capita, but that's already calculated annually. There's a few ways to get it to the new table, but we'll just sum up the gdp_per_capita for that country and year, and then divide by the number of rows we just summed. That'll get us the original value since all the gdp_per_capita values are the same for the same country and year.
 
 ```{r 3}
 suicide_by_year_df <- suicide_df %>% 
@@ -33,47 +56,102 @@ suicide_by_year_df <- suicide_df %>%
 head(suicide_by_year_df)
 ```
 
+Now we want to calculate the percent of people that commit suicide for every country and for every year. You can see that calculation in the first argument to mutate. That function will add a new column with the results. Then we want the percent of people who commit suicide for every 100 gdp per capita
+
 ```{r 4}
 suicide_by_year_df <- suicide_by_year_df %>% 
-  mutate(suicide_percentage = suicide_no / population * 100, suicide_percent_per_100gdp = suicide_percentage/gdp_per_capita * 100) 
+  mutate(suicide_percentage = suicide_no / population * 100, suicide_percent_per_100gdppc = suicide_percentage/gdp_per_capita * 100) 
 head(suicide_by_year_df)
 ```
 
+Now we're all ready to start plotting the data to get an idea of what we're working with. We do that by using the ggplot function. Info on how to use that is on that rdocumentation website. Here it is again: https://www.rdocumentation.org/
 
-Just by the spread, you'd think we'd have a roughly inverse relationship between the percent of a population committing suicide and the gdp_per_capita, but the linear regression line reveals that there might be a slightly positive linear relationship between the two or maybe no relationship at all.
+On the x-axis we'll have the gdp_per_capita and on the y-axis we'll have the suicide_percentage. Each dot will represent an observation. The line running through the points will try to establish a linear relationship between the two variables as best it can.
+
 ```{r 5}
 suicide_by_year_df %>% ggplot(aes(x = gdp_per_capita, y = suicide_percentage)) + geom_point() + geom_smooth(method=lm)
 ```
-Here's a better look at the distribution of gdp_per_capita we saw in the last plot. 
+
+Just by the spread, you'd think we'd have a roughly inverse relationship between the percent of a population committing suicide and the gdp_per_capita, but the linear regression line reveals that there might be a slightly positive linear relationship between the two or maybe no relationship at all.There's clearly more dots near the left end of the x-axis, so to get a better look at how gdp_per_capita is distributed we'll use a histogram.
+
 ```{r 6}
 suicide_by_year_df %>% ggplot(aes(x = gdp_per_capita)) + geom_histogram()
 ```
 
-Another look
+Each bar represents the amount of dots that fell within or directly above it. As you can see there's a significant negative skew on the distribution of gdp_per_capita (there's way more on the left just as we expected). There also appears to be a few outliers - data points way outside where most of them fall.
+We'll use a boxplot to be sure.
+
 ```{r 7}
 suicide_by_year_df %>% ggplot(aes(y = gdp_per_capita)) + geom_boxplot()
 ```
 
+The dots represent outliers, the black horizontal line represents the median (the value in the middle if you lined up all values from least to greatest), and the box represents the inter-quartile range (where the middle half fall). Next we'll due the same thing we did before, where where we plotted gdp_per_capita vs. suicide_percentage, but we'll do for individual years, starting in 1990 and then for every 5 years after up to 2015.
+
 ```{r 8}
-suicide_by_year_df %>% filter(year %in% c("1990","1995", "2000", "2010","2015")) %>%
+suicide_by_year_df %>% filter(year %in% c("1990","1995", "2000", "2005","2010","2015")) %>%
   ggplot(aes(x=gdp_per_capita, y=suicide_percentage)) +
   facet_grid("year") +
   geom_point() + 
   geom_smooth(method=lm)
 ```
 
-Now gdp_per_capita across time
+So there's some obvious variability in the linear regression line. But on average, it's definitely got a positive slope.
+
+Now we'll plot gdp_per_capita across time followed by suicide percentage across time, to get an idea of how they might relate.
+
+
 ```{r 9}
 suicide_by_year_df %>% ggplot(aes(x = year, y = gdp_per_capita)) + geom_point() + geom_smooth(method=lm)
 ```
-And suicide rates across time. This contradicts the claim that there's a relationship between gdp per capita and suicide rates, since, on average, gdp steadily climbed while suicide percentage stayed constant.
 ```{r 10}
 suicide_by_year_df %>% ggplot(aes(x = year, y = suicide_percentage)) + geom_point() + geom_smooth(method=lm)
 ```
 
+This contradicts the claim that there's a relationship between gdp per capita and suicide rates, since, on average, gdp steadily climbed while suicide percentage stayed constant. Next, we'll plot year vs. suicide rate per 100gdppc. This will give us an idea of how they're relationship has changed over time
 
 ```{r 11}
-suicide_by_year_df %>% ggplot(aes(x = year, y = suicide_percent_per_100gdp)) + geom_point() + geom_smooth(method=lm)
+suicide_by_year_df %>% ggplot(aes(x = year, y = suicide_percent_per_100gdppc)) + geom_point() + geom_smooth()
 ```
 
+So not much change at all. If anything a decrease.
+Now we'll move to actually fitting a linear model on the data. We'll try to predict suicide percentage based on the gdp_per_capita
 
+```{r 12}
+lin_fit <- lm(suicide_percentage~gdp_per_capita, data=suicide_by_year_df)
+lin_fit
+```
+
+Here we see a positive correlation, as we expected.
+Next we print from statistics on this model to get an idea of how much we can trust it. We'll use a function tidy from the broom package to do this.
+
+```{r 13}
+library(broom)
+lin_fit %>% tidy()
+```
+
+So p-value for the estimate on gdp_per_capita's relationship to suicide rate is very very small (well below .05). This is great news because a small p-value indicates you can trust the model more.
+
+For more on interpreting p and t values: https://blog.minitab.com/blog/statistics-and-quality-data-analysis/what-are-t-values-and-p-values-in-statistics
+
+Next we want the "fitted" values (the values the model predicts for a suicide rate) vs. the "residuals" (values that correspond to the fitted values difference from the actuals
+
+```{r 14}
+augmented_lin_fit <- lin_fit %>% 
+  augment()
+augmented_lin_fit %>%
+  head()
+```
+
+THen we plot them
+
+```{r 15}
+augmented_lin_fit %>%
+  ggplot(aes(x=.fitted,y=.resid)) +
+    geom_point() + 
+    geom_smooth() +
+    labs(x="fitted", y="residual")
+```
+
+We want this to be linear because that indicates a better model. It looks decent, but not great. Indicating we should start looking for other models, but that's where this tutorial ends!
+
+For way more in depth suicide statistics go here: https://afsp.org/about-suicide/suicide-statistics/
