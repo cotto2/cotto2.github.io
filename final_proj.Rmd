@@ -1,0 +1,79 @@
+---
+title: "final_proj"
+author: "christian otto"
+date: "5/21/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+1.See what distribution of gdp_per_capita / suicides_percentage is across countries.
+
+```{r 1}
+library(tidyverse)
+suicide_df <- read_csv("suicide.csv")
+head(suicide_df)
+```
+
+```{r 2}
+suicide_df <- suicide_df %>% rename('gdp_per_capita' = 'gdp_per_capita ($)' , 'suicide/100k' = 'suicides/100k pop') %>%
+  select("country","year","sex","age","suicide/100k","gdp_per_capita", "suicides_no", "population") 
+head(suicide_df)
+```
+
+
+
+```{r 3}
+suicide_by_year_df <- suicide_df %>% 
+  group_by(country, year) %>%
+  summarize(suicide_no = sum(suicides_no), population = sum(population), gdp_per_capita = sum(gdp_per_capita)/n()) %>%
+  ungroup()
+head(suicide_by_year_df)
+```
+
+```{r 4}
+suicide_by_year_df <- suicide_by_year_df %>% 
+  mutate(suicide_percentage = suicide_no / population * 100, suicide_percent_per_100gdp = suicide_percentage/gdp_per_capita * 100) 
+head(suicide_by_year_df)
+```
+
+
+Just by the spread, you'd think we'd have a roughly inverse relationship between the percent of a population committing suicide and the gdp_per_capita, but the linear regression line reveals that there might be a slightly positive linear relationship between the two or maybe no relationship at all.
+```{r 5}
+suicide_by_year_df %>% ggplot(aes(x = gdp_per_capita, y = suicide_percentage)) + geom_point() + geom_smooth(method=lm)
+```
+Here's a better look at the distribution of gdp_per_capita we saw in the last plot. 
+```{r 6}
+suicide_by_year_df %>% ggplot(aes(x = gdp_per_capita)) + geom_histogram()
+```
+
+Another look
+```{r 7}
+suicide_by_year_df %>% ggplot(aes(y = gdp_per_capita)) + geom_boxplot()
+```
+
+```{r 8}
+suicide_by_year_df %>% filter(year %in% c("1990","1995", "2000", "2010","2015")) %>%
+  ggplot(aes(x=gdp_per_capita, y=suicide_percentage)) +
+  facet_grid("year") +
+  geom_point() + 
+  geom_smooth(method=lm)
+```
+
+Now gdp_per_capita across time
+```{r 9}
+suicide_by_year_df %>% ggplot(aes(x = year, y = gdp_per_capita)) + geom_point() + geom_smooth(method=lm)
+```
+And suicide rates across time. This contradicts the claim that there's a relationship between gdp per capita and suicide rates, since, on average, gdp steadily climbed while suicide percentage stayed constant.
+```{r 10}
+suicide_by_year_df %>% ggplot(aes(x = year, y = suicide_percentage)) + geom_point() + geom_smooth(method=lm)
+```
+
+
+```{r 11}
+suicide_by_year_df %>% ggplot(aes(x = year, y = suicide_percent_per_100gdp)) + geom_point() + geom_smooth(method=lm)
+```
+
+
